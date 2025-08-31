@@ -1,0 +1,19 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318 # ensure exposed
+      grpc: 
+        endpoint: 0.0.0.0:4317
+
+exporters:
+  debug:
+  otlp:
+    endpoint: jaeger:4317 # Jaeger OTLP
+    tls:
+      insecure: true # Disable TLS to stop the warnings
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [debug,otlp]

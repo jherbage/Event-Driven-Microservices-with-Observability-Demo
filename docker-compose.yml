@@ -1,0 +1,96 @@
+networks:
+  localstack:
+    driver: bridge
+    attachable: true
+    name: localstack
+services:
+  prep:
+    image: alpine:latest
+    container_name: prep_demo
+    working_dir: /workspace
+    command: ["/bin/sh", "-c", "apk add --no-cache zip go &&
+      rm -rf .zips &&
+      mkdir .zips && 
+      mkdir .zips/lambda-ingester-function &&
+      mkdir .zips/lambda-processor-function &&
+      cd go/job && (go test ./... || exit 1) &&
+      cd ../../go/job-generator &&
+      GOOS=${GOOS} GOARCH=${GOARCH} CGO_ENABLED=0 go build -o job-generator main.go &&
+      cd ../../go/job-ingester &&
+      GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bootstrap -tags lambda.norpc main.go &&
+      cd ../../go/job-processor &&
+      GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bootstrap -tags lambda.norpc main.go &&
+      cd ../../.zips &&
+      mv ../go/job-ingester/bootstrap lambda-ingester-function/. &&
+      zip -j ingester.zip lambda-ingester-function/* &&
+      rm -rf lambda-ingester-function &&
+      mv ../go/job-processor/bootstrap lambda-processor-function/. &&
+      zip -j processor.zip lambda-processor-function/* &&
+      rm -rf lambda-processor-function"]
+    volumes:
+      - './:/workspace'
+  localstack:
+    image: localstack/localstack:latest 
+    container_name: localstack_demo
+    networks:
+      - localstack
+    ports:
+      - '4510-4599:4510-4599'
+    environment:
+      - SERVICES=iam:4566,events:4566,sns:4566,sqs:4566,sts:4566,lambda:4566
+      - DEFAULT_REGION=us-east-1
+      - DEBUG=1
+      - HOSTNAME_EXTERNAL=localstack
+      - LAMBDA_DOCKER_NETWORK=localstack
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - './.localstack:/var/lib/localstack'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - prep
+  terraform:
+    image: hashicorp/terraform:latest
+    container_name: terraform_demo
+    networks:
+      - localstack
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ENDPOINT_URL=http://localstack:4566
+    volumes:
+      - './terraform:/workspace'
+      - './.zips:/workspace/zips'
+    working_dir: /workspace
+    entrypoint: ["/bin/sh", "-c", "terraform init && terraform apply -auto-approve"]
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: otel_collector
+    networks:
+      - localstack
+    ports:
+      - '4318:4318' # OTLP HTTP
+      - '4317:4317' # OTLP gRPC
+    volumes:
+      - ./otel-config.yaml:/etc/otel-config.yaml
+    command: ["--config=/etc/otel-config.yaml"]
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    networks:
+      - localstack
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "14250:14250" # OTLP gRPC receiver
+      - "6831:6831/udp" # Jaeger agent (UDP)
+      - "6832:6832/udp" # Jaeger agent (UDP)
+      - "5778:5778" # Configuration endpoint
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true

@@ -1,0 +1,7 @@
+/terraform/.terraform*
+/terraform/.terraform/*
+/terraform/terraform.tfstate*
+/.zips
+.terraform/zips
+bootstrap
+go/job-generator/job-generator

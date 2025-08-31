@@ -1,0 +1,16 @@
+[
+    {
+      "job_type": "report_generation",
+      "message": {
+        "target_table": "Sales Report",
+        "filters": "region=US"
+      }
+    },
+    {
+      "job_type": "does_not_exist",
+      "message": {
+        "target_table": "users",
+        "retention": 30
+      }
+    }
+  ]

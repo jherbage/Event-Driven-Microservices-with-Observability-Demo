@@ -1,0 +1,30 @@
+[
+    {
+      "job_type": "report_generation",
+      "message": {
+        "report_name": "Sales Report",
+        "filters": "region=US"
+      }
+    },
+    {
+      "job_type": "data_cleanup",
+      "message": {
+        "target_table": "users",
+        "retention": 30
+      }
+    },
+    {
+      "job_type": "user_onboarding",
+      "message": {
+        "user_id": "12345",
+        "user_name": "John Doe"
+      }
+    },
+    {
+      "job_type": "long_running_job",
+      "message": {
+        "task_name": "Data Migration",
+        "timeout": 300
+      }
+    }
+  ]
