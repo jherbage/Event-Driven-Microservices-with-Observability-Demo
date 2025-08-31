@@ -35,6 +35,3 @@ Job messages which fail at any stage in ingest or processing are posted to a dea
 * Make the logs available in a logging system such as ELK
 * Subscribers to the SNS topic. Extend the schema to accept a notification target.
 * The job schema propogation through the messages isn't as clean as I would like so could do with revisiting.
-* There are warning about clock skew on the ExecuteJob. Setting up an ntp container and syncing otel_collector and localhost to this should help although it's possible the lambda execution container would also need to be synchronised. I have left this for now.
-* Long running jobs traces aren't showing up
-* I need to tie together the trace story better so the processing of the SQS queue for an event is part of the same end to end trace that cover ingest and processing. Currently ExecuteJob (in processor) is tied to the ingest jobs trace but the queue processing isn't.

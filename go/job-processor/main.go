@@ -90,10 +90,6 @@ func initTracer() func() {
 }
 
 func handler(ctx context.Context, sqsEvent events.SQSEvent) error {
-	ctx, span := tracer.Start(ctx, "ProcessSQSEvent", trace.WithAttributes(
-		attribute.Int("sqs.message_count", len(sqsEvent.Records)),
-	))
-	defer span.End()
 
 	for _, message := range sqsEvent.Records {
 		processMessage(ctx, message)
@@ -113,28 +109,22 @@ func sendToDeadLetterQueue(ctx context.Context, messageBody string) {
 }
 
 func processMessage(ctx context.Context, message events.SQSMessage) {
-	ctx, span := tracer.Start(ctx, "ProcessQueue", trace.WithAttributes(
-		attribute.String("sqs.message_id", message.MessageId), // this isnt the propogated message id
-		attribute.String("sqs.queue_url", jobsTodoURL),
-	))
-	defer span.End()
 
 	log.Printf("Processing SQS message: %s", message.Body)
 
 	// Parse the SQS message into a Job
 	var job joblib.EnrichedPayload
 	if err := json.Unmarshal([]byte(message.Body), &job); err != nil {
-		span.RecordError(err)
 		log.Printf("failed to parse job message: %s, err: %s", message.Body, err)
 		publishToSNS(snsClient, snsTopicArn, fmt.Sprintf("failed to parse job message: %s, err: %v", message.Body, err))
 		sendToDeadLetterQueue(ctx, message.Body)
 		return
 	}
 
-	log.Printf("Context before extraction: %v", ctx)
-
 	// Extract the propagated trace context
 	traceparent := job.TraceContext
+	var executeCtx context.Context
+
 	if traceparent == "" {
 		log.Printf("No trace context found in the job message")
 	} else {
@@ -163,7 +153,7 @@ func processMessage(ctx context.Context, message events.SQSMessage) {
 			})
 
 			// Inject the SpanContext into the context
-			ctx = trace.ContextWithSpanContext(ctx, spanContext)
+			executeCtx = trace.ContextWithSpanContext(ctx, spanContext)
 			log.Printf("Manually added trace context: traceID=%s, spanID=%s", traceID.String(), spanID.String())
 		}
 	}
@@ -171,17 +161,14 @@ func processMessage(ctx context.Context, message events.SQSMessage) {
 	// Parse the job from the JobMessage
 	parsedJob, _, jobType, err := joblib.ParseJob(job.OriginalMessage)
 	if err != nil {
-		span.RecordError(err)
 		log.Printf("failed to parse job: %s, err: %s", job.OriginalMessage, err)
 		publishToSNS(snsClient, snsTopicArn, fmt.Sprintf("failed to parse job: %s, err: %s", job.OriginalMessage, err))
 		sendToDeadLetterQueue(ctx, message.Body)
 		return
 	}
 
-	log.Printf("Context after extraction: %v", ctx)
-
 	// Execute the job
-	_, jobSpan := tracer.Start(ctx, "ExecuteJob", trace.WithAttributes(
+	_, jobSpan := tracer.Start(executeCtx, "ExecuteJob", trace.WithAttributes(
 		attribute.String("job.type", *jobType),
 		attribute.String("message.id", job.ID),
 	))
@@ -201,7 +188,7 @@ func processMessage(ctx context.Context, message events.SQSMessage) {
 		))
 		publishToSNS(snsClient, snsTopicArn, fmt.Sprintf("failed to execute job: %v, err: %s", job, err))
 		// add to dead letter for retry
-		sendToDeadLetterQueue(ctx, message.Body)
+		sendToDeadLetterQueue(executeCtx, message.Body)
 		return
 	}
 

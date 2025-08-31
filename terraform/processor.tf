@@ -60,7 +60,7 @@ resource "aws_lambda_function" "processor" {
   runtime       = "provided.al2"
   handler       = "bootstrap"
   memory_size   = 128
-  timeout       = 20
+  timeout       = 900 # 15 minutes to allow for the long running jobs
 
   role          = aws_iam_role.processor_lambda_execution_role.arn
 
