@@ -18,6 +18,11 @@ An SNS topic is notified if ingester or processor fail at any stage of their pro
 
 Job messages which fail at any stage in ingest or processing are posted to a dead letter queue which is also the dead letter queue for both ingester and jobs-todo queue in case the lambda can't be triggered.
 
+## Observability
+
+Traces are written to jaeger. Metrics are automatically generated from the trace spans and sent to prometheus.
+Open Telemetry Collector provides the glue for passing on the traces, exporting the metrics, and generating metrics from spans. I am using the contrib Open Telemetry image to get support for the spanmetrics connector.
+
 ## Starting The Demo
 
 * clone the repo locally
@@ -27,6 +32,7 @@ Job messages which fail at any stage in ingest or processing are posted to a dea
 * Wait for the terraform_demo container to complete `docker-compose ps | grep terraform_demo | wc -l` should return 0. If 1 it's still running. Its takes a few minutes to build the resources needed in localstack.
 * Run the event generator `cd go/job-generator/;./job-generator` which will run indefinitely generating random jobs, some malformed, and sleeping for a random interval between the bursts of jobs. If you only want the generator to run for a specific number of minutes use the `--minutes` flag.
 * Examine your traces [here](http://localhost:16686/search)
+* Examine your metrics [here](http://localhost:9090/query)
 * Tear down with `docker-compose down`
 
 ## TO-DO

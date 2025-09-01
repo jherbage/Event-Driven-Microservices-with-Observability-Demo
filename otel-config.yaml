@@ -12,8 +12,28 @@ exporters:
     endpoint: jaeger:4317 # Jaeger OTLP
     tls:
       insecure: true # Disable TLS to stop the warnings
+  prometheus:
+    endpoint: 0.0.0.0:9464 # Prometheus scrape endpoint
+
+connectors:
+  spanmetrics:
+    exclude_dimensions: ['status.code'] # add later when status is better handled
+    histogram:
+      dimensions:
+        - name: service.name
+          default: unknown
+        - name: job.type
+          default: unknown
+      explicit:
+        buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
+    dimensions: 
+      - name: job.type
+    
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [debug,otlp]
+      exporters: [debug,otlp,spanmetrics]
+    metrics:
+      receivers: [spanmetrics] # use spanmetrics connector as a receiver for metrics from traces
+      exporters: [prometheus]
