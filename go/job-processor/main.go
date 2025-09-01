@@ -171,6 +171,7 @@ func processMessage(ctx context.Context, message events.SQSMessage) {
 	_, jobSpan := tracer.Start(executeCtx, "ExecuteJob", trace.WithAttributes(
 		attribute.String("job.type", *jobType),
 		attribute.String("message.id", job.ID),
+		attribute.String("sqs.message.id", message.MessageId),
 	))
 
 	defer func() {

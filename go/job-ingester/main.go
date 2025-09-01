@@ -91,8 +91,6 @@ func init() {
 }
 
 func handler(ctx context.Context, sqsEvent events.SQSEvent) error {
-	ctx, span := tracer.Start(ctx, "ProcessSQSEvent")
-	defer span.End()
 
 	for _, message := range sqsEvent.Records {
 		processMessage(ctx, message)
@@ -113,7 +111,7 @@ func sendToDeadLetterQueue(ctx context.Context, messageBody string) {
 
 func processMessage(ctx context.Context, message events.SQSMessage) {
 	ctx, span := tracer.Start(ctx, "ProcessMessage", trace.WithAttributes(
-		attribute.String("message.id", message.MessageId),
+		attribute.String("sqs.message.id", message.MessageId),
 	))
 	defer span.End()
 
@@ -130,7 +128,7 @@ func processMessage(ctx context.Context, message events.SQSMessage) {
 	}
 
 	// Parse the message into a Job
-	job, _, _, err := joblib.ParseJob(eventBridgeMessage.Detail)
+	job, _, jobType, err := joblib.ParseJob(eventBridgeMessage.Detail)
 	if err != nil {
 		span.RecordError(err)
 		log.Printf("failed to parse or validate job: %v", err)
@@ -139,9 +137,14 @@ func processMessage(ctx context.Context, message events.SQSMessage) {
 		return
 	}
 
+	// Add job type now we know it
+	span.SetAttributes(
+		attribute.String("job.type", *jobType),
+	)
+
 	enrichedPayload := joblib.EnrichedPayload{
 		OriginalMessage: []byte(eventBridgeMessage.Detail),
-		ID:              message.MessageId, // propogate the SQS message ID
+		ID:              message.MessageId, // propogate the SQS message ID in case we need it (tracing propogation should mean we don't)
 		Timestamp:       time.Now().Format(time.RFC3339),
 		Status:          joblib.StatusNew,
 		TraceContext:    fmt.Sprintf("00-%s-%s-01", span.SpanContext().TraceID(), span.SpanContext().SpanID()),
