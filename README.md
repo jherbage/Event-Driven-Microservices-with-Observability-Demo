@@ -4,7 +4,7 @@
 
 `job-ingester` is a server-less consumer service validating and enriching job requests posted to the event bridge with a source of `jobs`. Those events are queued to the `ingester` queue which triggers the lambda to process it. `job-ingester` then queues the job on `jobs-todo`. Lambda fits the requirement here if the job receipt rate is sporadic or fairly low volume. That would not be the case if the worker processing rate were high volume. I also don't have EKS available in localstack community, nor Beanstalk for that matter, so its not possible to deploy the service as a DaemonSet. Another simple option would be to deploy the service as an EC2 ASG scaling the ASG based on the size of the queue.
 
-`job-consumer` reads jobs from the `jobs-todo` queue. It is deployed as a lambda as well and the same reasoning above applies.
+`job-processor` reads jobs from the `jobs-todo` queue. It is deployed as a lambda as well and the same reasoning above applies.
 
 ### Message Processing
 
