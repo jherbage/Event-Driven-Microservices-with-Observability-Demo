@@ -29,6 +29,11 @@ services:
       rm -rf lambda-processor-function"]
     volumes:
       - './:/workspace'
+    healthcheck:
+      test: ["CMD", "test", "-f", "/workspace/.zips/processor.zip"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
   localstack:
     image: localstack/localstack:latest 
     container_name: localstack_demo
@@ -58,6 +63,8 @@ services:
     networks:
       - localstack
     depends_on:
+      prep:
+        condition: service_healthy
       localstack:
         condition: service_healthy
     environment:
