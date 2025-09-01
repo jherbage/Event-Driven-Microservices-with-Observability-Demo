@@ -95,5 +95,5 @@ resource "aws_lambda_alias" "processor_alias" {
 resource "aws_lambda_provisioned_concurrency_config" "processor_provisioned" {
   function_name          = aws_lambda_function.processor.function_name
   qualifier              = aws_lambda_alias.processor_alias.name
-  provisioned_concurrent_executions = 2
+  provisioned_concurrent_executions = 10 # needs to be higher than ingestor to take the long running jobs
 }

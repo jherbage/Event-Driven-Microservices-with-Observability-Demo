@@ -130,6 +130,12 @@ func processMessage(ctx context.Context, message events.SQSMessage) {
 	// Parse the message into a Job
 	job, _, jobType, err := joblib.ParseJob(eventBridgeMessage.Detail)
 	if err != nil {
+		// Add job type now if we know it
+		if jobType != nil {
+			span.SetAttributes(
+				attribute.String("job.type", *jobType),
+			)
+		}
 		span.RecordError(err)
 		log.Printf("failed to parse or validate job: %v", err)
 		publishToSNS(snsClient, snsTopicArn, fmt.Sprintf("failed to parse or validate job: %s", string(eventBridgeMessage.Detail)))
